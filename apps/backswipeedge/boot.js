@@ -24,6 +24,36 @@
     cal.mult = (x2 - x1) / g.getWidth();
   }
   
+  let patchedBack = undefined;
+  
+  let patchBackDraw = function() {
+    let w = WIDGETS.back;
+    if (w == undefined) return;
+    patchedBack = w;
+    if (w.origDraw != undefined) {
+      return;
+    }
+    w.origDraw = w.draw;
+    // change color from red to green
+    let draw = w.draw.toString().replace("\"#f00\"", "\"#0f0\"");
+    let paramName = draw.match(/^function\s*\(([a-z]+)\)/)[1];
+    // remove function() wrapper
+    draw = draw.replace(/^function\s*\(.*\)\s*\{\s*return\s*/, "{");
+    let code = "{let " + paramName + "=e;" + draw + ";}";
+    draw = undefined;
+    paramName = undefined;
+    w.draw = function(e) {
+      if (w.backswipe == undefined) {
+        w.origDraw(e);
+      } else {
+        eval(code);
+      }
+    };
+    w.redraw = function() {
+      w.draw(w);
+    };
+  };
+  
   // drag started
   let drag = false;
   // backswipe triggered
@@ -53,16 +83,29 @@
         // will go back on finger up
         trig = true;
         Bangle.buzz(50, 0.6);
+        if (patchedBack == undefined) patchBackDraw();
+        if (patchedBack != undefined) {
+          patchedBack.backswipe = 1;
+          patchedBack.redraw();
+        }
       }
     } else {
       if (x >= 140) {
         // dragged enough to the right to cancel backswipe
         trig = false;
         Bangle.buzz(50, 0.6);
+        if (patchedBack != undefined) {
+          patchedBack.backswipe = undefined;
+          patchedBack.redraw();
+        }
       }
     }
     if (e.b == 0) {
       if (trig) {
+        if (patchedBack != undefined) {
+          patchedBack.backswipe = undefined;
+          patchedBack.redraw();
+        }
         if (back != null) {
           back();
         } else {
